@@ -96,7 +96,7 @@ export default function Layout({ screen, onNavigate, onLogout }: Props) {
               </svg>
             </div>
             <div>
-              <div style={{ color: "#fff", fontWeight: 700, fontSize: 15, letterSpacing: "-0.02em" }}>LogiTrack</div>
+              <div style={{ color: "#fff", fontWeight: 700, fontSize: 15, letterSpacing: "-0.02em" }}>WordTrack</div>
               <div style={{ color: "#475569", fontSize: 10, letterSpacing: "0.05em", textTransform: "uppercase" }}>Gestión Logística</div>
             </div>
           </div>
