@@ -1,29 +1,10 @@
-import { useState } from "react";
-import Login from "./components/Login";
-import Layout from "./components/Layout";
-
-export type Screen =
-  | "dashboard"
-  | "nuevo-paquete"
-  | "consulta"
-  | "seguimiento"
-  | "reportes"
-  | "clientes"
-  | "rutas";
+import { useState } from 'react';
+import Login from './components/Login';
+import BackendApp from './components/BackendApp';
+import type { LoginResponse } from './config/api';
 
 export default function App() {
-  const [authenticated, setAuthenticated] = useState(false);
-  const [screen, setScreen] = useState<Screen>("dashboard");
-
-  if (!authenticated) {
-    return <Login onLogin={() => setAuthenticated(true)} />;
-  }
-
-  return (
-    <Layout
-      screen={screen}
-      onNavigate={setScreen}
-      onLogout={() => setAuthenticated(false)}
-    />
-  );
+  const [user,setUser]=useState<LoginResponse|null>(()=>{try{return JSON.parse(localStorage.getItem('wordtruck_user')||'null')}catch{return null}});
+  if(!user) return <Login onLogin={setUser}/>;
+  return <BackendApp user={user} onLogout={()=>{localStorage.removeItem('wordtruck_user');setUser(null)}}/>;
 }
