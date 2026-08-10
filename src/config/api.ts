@@ -1,5 +1,11 @@
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
 
+let authToken: string | null = null;
+
+export const setAuthToken = (token: string | null) => {
+  authToken = token;
+};
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -10,23 +16,42 @@ export class ApiError extends Error {
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {}),
+  };
+
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    headers,
   });
+
   const text = await response.text();
   let body: unknown = null;
   try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+
   if (!response.ok) {
-    const value = body as { mensaje?: string; message?: string } | null;
-    throw new ApiError(value?.mensaje || value?.message || `Error HTTP ${response.status}`, response.status);
+    const value = body as { mensaje?: string; message?: string; title?: string } | null;
+    throw new ApiError(
+      value?.mensaje || value?.message || value?.title || `Error HTTP ${response.status}`,
+      response.status
+    );
   }
+
   return body as T;
 }
 
-const json = (method: string, data?: unknown): RequestInit => ({ method, ...(data !== undefined ? { body: JSON.stringify(data) } : {}) });
+const json = (method: string, data?: unknown): RequestInit => ({
+  method,
+  ...(data !== undefined ? { body: JSON.stringify(data) } : {})
+});
 
 export const api = {
+  setToken: setAuthToken,
   login: (data: { correo: string; password: string }) => request<LoginResponse>('/api/usuarios/login', json('POST', data)),
   usuarios: {
     all: () => request<Usuario[]>('/api/usuarios'),
@@ -71,7 +96,7 @@ export const api = {
 export interface Usuario { usuarioId: number; rolId: number; rolNombre: string; nombre: string; apellido: string; correo: string; telefono?: string; estado: boolean; fechaRegistro: string; }
 export interface UsuarioCreate { rolId: number; nombre: string; apellido: string; correo: string; telefono?: string; password: string; }
 export interface UsuarioUpdate { rolId: number; nombre: string; apellido: string; correo: string; telefono?: string; estado: boolean; }
-export interface LoginResponse { usuarioId: number; nombre: string; apellido: string; correo: string; rolNombre: string; }
+export interface LoginResponse { usuarioId: number; nombre: string; apellido: string; correo: string; rolNombre: string; token?: string; }
 export interface Cliente { clienteId: number; usuarioId: number; nombre: string; apellido: string; correo: string; documento?: string; direccion?: string; }
 export interface ClienteCreate { usuarioId: number; documento?: string; direccion?: string; }
 export interface ClienteUpdate { documento?: string; direccion?: string; }

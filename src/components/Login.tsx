@@ -1,8 +1,97 @@
-import { useState } from 'react';
-import { api, ApiError, type LoginResponse } from '../config/api';
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
-export default function Login({ onLogin }: { onLogin: (user: LoginResponse) => void }) {
-  const [correo,setCorreo]=useState(''); const [password,setPassword]=useState(''); const [error,setError]=useState(''); const [loading,setLoading]=useState(false);
-  const submit=async(e:React.FormEvent)=>{e.preventDefault();if(!correo||!password){setError('Complete correo y contraseña.');return}setLoading(true);setError('');try{const user=await api.login({correo,password});localStorage.setItem('wordtruck_user',JSON.stringify(user));onLogin(user)}catch(e){setError(e instanceof ApiError?e.message:'No se pudo conectar con el servidor. Verifique que la API esté ejecutándose.')}finally{setLoading(false)}};
-  return <div style={{minHeight:'100vh',display:'grid',gridTemplateColumns:'1fr 430px',background:'#0d1b2a'}}><div style={{display:'flex',alignItems:'center',padding:60}}><div style={{maxWidth:520}}><div style={{display:'flex',gap:12,alignItems:'center',marginBottom:45}}><div style={{width:46,height:46,borderRadius:9,background:'#f59e0b',display:'grid',placeItems:'center',fontWeight:900,color:'#0d1b2a'}}>W</div><div><b style={{fontSize:20,color:'#fff'}}>WordTruck</b><div style={{fontSize:11,color:'#64748b'}}>Sistema de Gestión Logística</div></div></div><h1 style={{color:'#fff',fontSize:40,lineHeight:1.1}}>Control total de tu <span style={{color:'#f59e0b'}}>cadena logística</span></h1><p style={{color:'#94a3b8',lineHeight:1.7}}>Paquetes, clientes, seguimiento, facturación y operación conectados directamente con tu API ASP.NET Core.</p></div></div><div style={{background:'#f8fafc',display:'flex',alignItems:'center',padding:48}}><form onSubmit={submit} style={{width:'100%'}}><h2>Iniciar sesión</h2><p style={{color:'#64748b',fontSize:13,marginBottom:28}}>Use un usuario registrado en WordTruck.</p><label style={{fontSize:13,fontWeight:600}}>Correo<input value={correo} onChange={e=>setCorreo(e.target.value)} type='email' placeholder='admin@ejemplo.com' style={{width:'100%',boxSizing:'border-box',padding:12,margin:'7px 0 16px',border:'1px solid #cbd5e1',borderRadius:8}}/></label><label style={{fontSize:13,fontWeight:600}}>Contraseña<input value={password} onChange={e=>setPassword(e.target.value)} type='password' placeholder='••••••••' style={{width:'100%',boxSizing:'border-box',padding:12,margin:'7px 0 16px',border:'1px solid #cbd5e1',borderRadius:8}}/></label>{error&&<div style={{padding:11,background:'#fef2f2',color:'#b91c1c',borderRadius:8,fontSize:12,marginBottom:16}}>{error}</div>}<button disabled={loading} style={{width:'100%',padding:12,border:0,borderRadius:8,background:'#f59e0b',fontWeight:800,cursor:'pointer'}}>{loading?'Verificando…':'Ingresar al sistema'}</button></form></div></div>
+export default function Login() {
+  const { login, loading, error } = useAuth();
+  const [correo, setCorreo] = useState('wordy848@gmail.com');
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await login(correo, password);
+  };
+
+  return (
+    <div className="min-h-screen w-full flex flex-col md:flex-row bg-slate-900 text-slate-100">
+      {/* Panel Izquierdo: Branding WordTruck */}
+      <div className="md:w-1/2 p-8 md:p-16 flex flex-col justify-between bg-[#0b132b] border-r border-slate-800">
+        <div>
+          <div className="flex items-center gap-3 mb-12">
+            <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center text-slate-950 font-black text-2xl shadow-lg shadow-amber-500/20">
+              W
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white tracking-tight">WordTruck</h1>
+              <p className="text-xs text-slate-400 font-medium">Sistema de Gestión Logística</p>
+            </div>
+          </div>
+
+          <div className="max-w-md mt-16">
+            <h2 className="text-4xl md:text-5xl font-extrabold text-white leading-tight mb-6">
+              Control total de tu <span className="text-amber-500">cadena logística</span>
+            </h2>
+            <p className="text-slate-400 text-base md:text-lg leading-relaxed">
+              Paquetes, clientes, seguimiento, facturación y operación conectados directamente con tu API ASP.NET Core.
+            </p>
+          </div>
+        </div>
+
+        <div className="text-xs text-slate-500 mt-12">
+          © {new Date().getFullYear()} WordTruck Logistics System.
+        </div>
+      </div>
+
+      {/* Panel Derecho: Formulario de Inicio de Sesión */}
+      <div className="md:w-1/2 bg-white text-slate-900 p-8 md:p-16 flex items-center justify-center">
+        <div className="w-full max-w-md space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Iniciar sesión</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Use un usuario registrado en WordTruck.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-semibold text-slate-700">Correo</label>
+              <input
+                type="email"
+                value={correo}
+                onChange={(e) => setCorreo(e.target.value)}
+                placeholder="ejemplo@correo.com"
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-slate-900"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-semibold text-slate-700">Contraseña</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-slate-900"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl shadow-lg shadow-amber-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            >
+              {loading ? 'Ingresando...' : 'Ingresar al sistema'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
 }

@@ -1,10 +1,26 @@
-import { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/Login';
 import BackendApp from './components/BackendApp';
-import type { LoginResponse } from './config/api';
+
+function AppContent() {
+  const { user, logout } = useAuth();
+
+  if (!user) {
+    return <Login />;
+  }
+
+  return (
+    <BackendApp
+      user={user}
+      onLogout={logout}
+    />
+  );
+}
 
 export default function App() {
-  const [user,setUser]=useState<LoginResponse|null>(()=>{try{return JSON.parse(localStorage.getItem('wordtruck_user')||'null')}catch{return null}});
-  if(!user) return <Login onLogin={setUser}/>;
-  return <BackendApp user={user} onLogout={()=>{localStorage.removeItem('wordtruck_user');setUser(null)}}/>;
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
 }
