@@ -1,220 +1,259 @@
-import { useState } from "react";
-
-const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio"];
-const deliveredData = [3820, 4150, 3980, 4600, 5100, 4890, 5420];
-const transitData = [420, 380, 510, 460, 530, 490, 487];
-const incidentData = [52, 48, 61, 44, 58, 63, 58];
-
-const maxDelivered = Math.max(...deliveredData);
-
-const topClients = [
-  { name: "Distribuidora Morales S.A.", envios: 284, entregados: 271, tasa: "95.4%" },
-  { name: "Farmacia El Sol", envios: 198, entregados: 193, tasa: "97.5%" },
-  { name: "Electrónica Zenteno", envios: 175, entregados: 162, tasa: "92.6%" },
-  { name: "Mueblería Confort", envios: 143, entregados: 138, tasa: "96.5%" },
-  { name: "Clínica San Rafael", envios: 127, entregados: 125, tasa: "98.4%" },
-];
-
-const routePerf = [
-  { ruta: "R-01", nombre: "CDMX Norte", paquetes: 1840, tiempo: "2.1 días", tasa: "96.2%" },
-  { ruta: "R-02", nombre: "CDMX Sur", paquetes: 1620, tiempo: "1.9 días", tasa: "95.8%" },
-  { ruta: "R-03", nombre: "GDL Zona Metro", paquetes: 980, tiempo: "2.8 días", tasa: "94.1%" },
-  { ruta: "R-04", nombre: "MTY Centro", paquetes: 870, tiempo: "3.2 días", tasa: "93.7%" },
-  { ruta: "R-05", nombre: "PUE-TLX", paquetes: 560, tiempo: "2.4 días", tasa: "96.8%" },
-  { ruta: "R-06", nombre: "QRO-SLP", paquetes: 490, tiempo: "3.5 días", tasa: "92.4%" },
-];
+import React, { useEffect, useState } from 'react';
+import { facturasService } from '../services/facturasService';
+import { paquetesService } from '../services/paquetesService';
+import type { FacturaDto, PaqueteDto } from '../services/types';
 
 export default function Reports() {
-  const [period, setPeriod] = useState("2024-07");
-  const [tab, setTab] = useState<"resumen" | "clientes" | "rutas">("resumen");
+  const [facturas, setFacturas] = useState<FacturaDto[]>([]);
+  const [paquetes, setPaquetes] = useState<PaqueteDto[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const tabs: { id: typeof tab; label: string }[] = [
-    { id: "resumen", label: "Resumen General" },
-    { id: "clientes", label: "Por Cliente" },
-    { id: "rutas", label: "Por Ruta" },
-  ];
+  // Campos del formulario para emitir factura
+  const [paqueteId, setPaqueteId] = useState<string>('');
+  const [total, setTotal] = useState<string>('');
+  const [metodoPago, setMetodoPago] = useState<string>('Tarjeta');
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [facturasData, paquetesData] = await Promise.all([
+        facturasService.getAll(),
+        paquetesService.getAll(),
+      ]);
+      setFacturas(facturasData || []);
+      setPaquetes(paquetesData || []);
+    } catch (err: any) {
+      setError(err?.message || 'Error al conectar con la API de reportes.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+
+    const pId = parseInt(paqueteId, 10);
+    const totalNum = parseFloat(total);
+
+    if (isNaN(pId) || pId <= 0) {
+      setError('Seleccione un paquete válido.');
+      return;
+    }
+
+    if (isNaN(totalNum) || totalNum <= 0) {
+      setError('El total debe ser un monto mayor a $0.00.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await facturasService.create({
+        paqueteId: pId,
+        total: totalNum,
+        metodoPago: metodoPago,
+      });
+
+      setSuccessMsg('¡Factura creada y registrada en el sistema!');
+      setPaqueteId('');
+      setTotal('');
+      setMetodoPago('Tarjeta');
+      loadData();
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo generar la factura para este paquete.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Cálculos dinámicos para los reportes
+  const totalIngresos = facturas.reduce((acc, f) => acc + (f.total || 0), 0);
+  const totalFacturas = facturas.length;
+  const promedioFactura = totalFacturas > 0 ? totalIngresos / totalFacturas : 0;
+
+  // Filtrar paquetes que aún no han sido facturados
+  const paquetesFacturadosIds = new Set(facturas.map((f) => f.paqueteId));
+  const paquetesSinFacturar = paquetes.filter((p) => !paquetesFacturadosIds.has(p.paqueteId));
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Controls */}
-      <div style={{ background: "#fff", borderRadius: 12, padding: "18px 24px", border: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", gap: 4 }}>
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13,
-                fontWeight: 600,
-                background: tab === t.id ? "#0d1b2a" : "transparent",
-                color: tab === t.id ? "#fff" : "#64748b",
-                transition: "all 0.15s"
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
+    <div className="space-y-6">
+      {/* Encabezado */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Reportes y Facturación</h1>
+          <p className="text-sm text-slate-500">Métricas en tiempo real e historial financiero de WordTruck</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <input
-            type="month" value={period} onChange={e => setPeriod(e.target.value)}
-            style={{ padding: "7px 12px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 13, outline: "none", color: "#374151" }}
-          />
-          <button style={{
-            padding: "7px 16px", background: "#f59e0b", border: "none",
-            borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#0d1b2a", cursor: "pointer"
-          }}>
-            ↓ Exportar CSV
-          </button>
+        <button
+          onClick={loadData}
+          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-all flex items-center gap-2"
+        >
+          ↻ Actualizar
+        </button>
+      </div>
+
+      {/* Tarjetas de Resumen KPI */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Reporte Financiero</h3>
+          <p className="text-3xl font-black text-slate-900">${totalIngresos.toFixed(2)}</p>
+          <p className="text-xs font-semibold text-amber-600 mt-2">{totalFacturas} facturas emitidas</p>
+          <span className="text-[11px] text-slate-400 block mt-1">Los datos se calculan directamente desde la API.</span>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Reporte de Paquetes</h3>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-sm font-medium text-slate-600">Registrados</span>
+            <span className="text-2xl font-bold text-slate-900">{paquetes.length}</span>
+          </div>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
+            <span className="text-xs text-slate-500">Pendientes de factura</span>
+            <span className="text-xs font-bold text-amber-600">{paquetesSinFacturar.length}</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Promedio por Factura</h3>
+          <p className="text-3xl font-black text-slate-900">${promedioFactura.toFixed(2)}</p>
+          <p className="text-xs font-semibold text-emerald-600 mt-2">Ticket medio de cobro</p>
+          <span className="text-[11px] text-slate-400 block mt-1">Suma acumulada / Total de facturas</span>
         </div>
       </div>
 
-      {tab === "resumen" && (
-        <>
-          {/* KPI Summary */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-            {[
-              { label: "Total paquetes", val: "5,420", sub: "Julio 2024", color: "#3b82f6" },
-              { label: "Entregados", val: "5,142", sub: "94.9% tasa", color: "#10b981" },
-              { label: "Tiempo promedio", val: "2.4 días", sub: "–0.2 vs junio", color: "#f59e0b" },
-              { label: "Incidencias", val: "58", sub: "1.07% del total", color: "#ef4444" },
-            ].map(k => (
-              <div key={k.label} style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", border: "1px solid #e2e8f0" }}>
-                <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500, marginBottom: 10 }}>{k.label}</div>
-                <div style={{ fontSize: 26, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono, monospace", letterSpacing: "-0.02em" }}>{k.val}</div>
-                <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{k.sub}</div>
-              </div>
-            ))}
-          </div>
+      {/* Grid Principal: Listado y Formulario */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Tabla de Facturas */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Detalle de Facturas Emitidas</h2>
 
-          {/* Bar chart — monthly */}
-          <div style={{ background: "#fff", borderRadius: 12, padding: "24px", border: "1px solid #e2e8f0" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>Paquetes entregados — últimos 7 meses</div>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 24 }}>Volumen mensual acumulado</div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 140 }}>
-              {months.map((m, i) => (
-                <div key={m} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                  <div style={{ fontSize: 11, color: "#374151", fontFamily: "JetBrains Mono, monospace", fontWeight: 600 }}>
-                    {(deliveredData[i] / 1000).toFixed(1)}k
-                  </div>
-                  <div
-                    style={{
-                      width: "100%", borderRadius: "4px 4px 0 0",
-                      height: `${(deliveredData[i] / maxDelivered) * 110}px`,
-                      background: i === 6 ? "#f59e0b" : i === months.length - 2 ? "#93c5fd" : "#e2e8f0",
-                      transition: "background 0.15s"
-                    }}
-                  />
-                  <span style={{ fontSize: 10, color: "#94a3b8" }}>{m.slice(0, 3)}</span>
-                </div>
-              ))}
+          {loading ? (
+            <p className="text-sm text-slate-500 py-4">Cargando datos financieros...</p>
+          ) : facturas.length === 0 ? (
+            <p className="text-sm text-slate-400 py-4 text-center">No hay facturas registradas en la base de datos.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="py-3 px-2">ID Factura</th>
+                    <th className="py-3 px-2">Código Tracking</th>
+                    <th className="py-3 px-2">Total</th>
+                    <th className="py-3 px-2">Método Pago</th>
+                    <th className="py-3 px-2">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                  {facturas.map((item) => (
+                    <tr key={item.facturaId} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-2 font-bold text-amber-600">#{item.facturaId}</td>
+                      <td className="py-3 px-2 font-medium text-slate-900">
+                        {item.tracking || `Paquete #${item.paqueteId}`}
+                      </td>
+                      <td className="py-3 px-2 font-black text-slate-900">${item.total.toFixed(2)}</td>
+                      <td className="py-3 px-2">
+                        <span className="px-2 py-1 bg-slate-100 text-slate-800 rounded-lg text-xs font-semibold">
+                          {item.metodoPago}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-slate-500 text-xs">
+                        {new Date(item.fecha).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-
-          {/* Two small charts */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            {[
-              { title: "En tránsito por mes", data: transitData, color: "#3b82f6" },
-              { title: "Incidencias por mes", data: incidentData, color: "#ef4444" },
-            ].map(chart => {
-              const mx = Math.max(...chart.data);
-              return (
-                <div key={chart.title} style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", border: "1px solid #e2e8f0" }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>{chart.title}</div>
-                  <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 80 }}>
-                    {months.map((m, i) => (
-                      <div key={m} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                        <div style={{
-                          width: "100%", borderRadius: "3px 3px 0 0",
-                          height: `${(chart.data[i] / mx) * 64}px`,
-                          background: i === 6 ? chart.color : chart.color + "44"
-                        }} />
-                        <span style={{ fontSize: 9, color: "#94a3b8" }}>{m.slice(0, 1)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {tab === "clientes" && (
-        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
-          <div style={{ padding: "20px 24px", borderBottom: "1px solid #f1f5f9" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Top clientes por volumen</div>
-            <div style={{ fontSize: 12, color: "#94a3b8" }}>Rendimiento de entrega por cliente — {period}</div>
-          </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                {["#", "Cliente", "Envíos", "Entregados", "Tasa de éxito", "Rendimiento"].map(h => (
-                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#64748b", letterSpacing: "0.05em", textTransform: "uppercase", borderBottom: "1px solid #e2e8f0" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {topClients.map((c, i) => {
-                const pct = parseFloat(c.tasa);
-                return (
-                  <tr key={c.name} style={{ borderBottom: i < topClients.length - 1 ? "1px solid #f1f5f9" : "none" }}>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#94a3b8", fontFamily: "JetBrains Mono, monospace" }}>{String(i + 1).padStart(2, "0")}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{c.name}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontFamily: "JetBrains Mono, monospace", color: "#374151" }}>{c.envios}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontFamily: "JetBrains Mono, monospace", color: "#374151" }}>{c.entregados}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontFamily: "JetBrains Mono, monospace", fontWeight: 700, color: pct >= 96 ? "#10b981" : pct >= 93 ? "#f59e0b" : "#ef4444" }}>{c.tasa}</td>
-                    <td style={{ padding: "12px 16px", width: 120 }}>
-                      <div style={{ height: 6, background: "#f1f5f9", borderRadius: 99 }}>
-                        <div style={{ height: "100%", width: `${pct}%`, background: pct >= 96 ? "#10b981" : pct >= 93 ? "#f59e0b" : "#ef4444", borderRadius: 99 }} />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          )}
         </div>
-      )}
 
-      {tab === "rutas" && (
-        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
-          <div style={{ padding: "20px 24px", borderBottom: "1px solid #f1f5f9" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Rendimiento por ruta</div>
-            <div style={{ fontSize: 12, color: "#94a3b8" }}>Volumen, tiempo y tasa de entrega — {period}</div>
-          </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                {["Ruta", "Nombre", "Paquetes", "Tiempo prom.", "Tasa entrega", "Rendimiento"].map(h => (
-                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#64748b", letterSpacing: "0.05em", textTransform: "uppercase", borderBottom: "1px solid #e2e8f0" }}>{h}</th>
+        {/* Formulario para emitir nueva factura */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit">
+          <h2 className="text-lg font-bold text-slate-900 mb-1">Emitir Nueva Factura</h2>
+          <p className="text-xs text-slate-500 mb-4">Vincular un paquete y registrar su pago en la API</p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-medium">
+                {error}
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-medium">
+                {successMsg}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Seleccionar Paquete</label>
+              <select
+                value={paqueteId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setPaqueteId(id);
+                  // Rellenar automáticamente la tarifa del paquete si existe
+                  const pkg = paquetes.find((p) => p.paqueteId === parseInt(id, 10));
+                  if (pkg && pkg.tarifa) {
+                    setTotal(pkg.tarifa.toString());
+                  }
+                }}
+                required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="">-- Seleccionar paquete --</option>
+                {paquetes.map((p) => (
+                  <option key={p.paqueteId} value={p.paqueteId}>
+                    #{p.paqueteId} - {p.tracking} ({p.origen} → {p.destino})
+                  </option>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {routePerf.map((r, i) => {
-                const pct = parseFloat(r.tasa);
-                return (
-                  <tr key={r.ruta} style={{ borderBottom: i < routePerf.length - 1 ? "1px solid #f1f5f9" : "none" }}>
-                    <td style={{ padding: "12px 16px" }}>
-                      <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, fontWeight: 700, background: "#fef3c7", color: "#b45309", padding: "3px 8px", borderRadius: 6 }}>{r.ruta}</span>
-                    </td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500, color: "#0f172a" }}>{r.nombre}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontFamily: "JetBrains Mono, monospace", color: "#374151" }}>{r.paquetes.toLocaleString()}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontFamily: "JetBrains Mono, monospace", color: "#374151" }}>{r.tiempo}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontFamily: "JetBrains Mono, monospace", fontWeight: 700, color: pct >= 96 ? "#10b981" : pct >= 93 ? "#f59e0b" : "#ef4444" }}>{r.tasa}</td>
-                    <td style={{ padding: "12px 16px", width: 120 }}>
-                      <div style={{ height: 6, background: "#f1f5f9", borderRadius: 99 }}>
-                        <div style={{ height: "100%", width: `${pct}%`, background: pct >= 96 ? "#10b981" : pct >= 93 ? "#f59e0b" : "#ef4444", borderRadius: 99 }} />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Monto Total ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={total}
+                onChange={(e) => setTotal(e.target.value)}
+                placeholder="Ej: 500.00"
+                required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Método de Pago</label>
+              <select
+                value={metodoPago}
+                onChange={(e) => setMetodoPago(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="Tarjeta">Tarjeta de Crédito / Débito</option>
+                <option value="Efectivo">Efectivo contra entrega</option>
+                <option value="Transferencia">Transferencia Bancaria</option>
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-md shadow-amber-500/20 disabled:opacity-50"
+            >
+              {submitting ? 'Procesando...' : 'Guardar Factura'}
+            </button>
+          </form>
         </div>
-      )}
+      </div>
     </div>
   );
 }

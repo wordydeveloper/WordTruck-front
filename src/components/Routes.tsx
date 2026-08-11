@@ -1,165 +1,181 @@
-import { useState } from "react";
-
-const routes = [
-  { id: "R-01", nombre: "CDMX Norte", unidades: 8, conductores: 8, paquetesHoy: 312, entregados: 298, pendientes: 14, km: 240, status: "Activo", zonas: ["Gustavo A. Madero", "Azcapotzalco", "Tlalnepantla"] },
-  { id: "R-02", nombre: "CDMX Sur", unidades: 6, conductores: 6, paquetesHoy: 274, entregados: 261, pendientes: 13, km: 195, status: "Activo", zonas: ["Benito Juárez", "Coyoacán", "Xochimilco"] },
-  { id: "R-03", nombre: "GDL Zona Metro", unidades: 5, conductores: 5, paquetesHoy: 188, entregados: 172, pendientes: 16, km: 310, status: "Activo", zonas: ["Guadalajara", "Zapopan", "Tlaquepaque"] },
-  { id: "R-04", nombre: "MTY Centro", unidades: 4, conductores: 4, paquetesHoy: 156, entregados: 140, pendientes: 16, km: 420, status: "Activo", zonas: ["Monterrey", "San Pedro", "Garza García"] },
-  { id: "R-05", nombre: "PUE-TLX", unidades: 3, conductores: 3, paquetesHoy: 98, entregados: 94, pendientes: 4, km: 180, status: "Activo", zonas: ["Puebla Centro", "Tlaxcala", "Cholula"] },
-  { id: "R-06", nombre: "QRO-SLP", unidades: 3, conductores: 3, paquetesHoy: 72, entregados: 65, pendientes: 7, km: 520, status: "Mantenimiento", zonas: ["Querétaro", "San Luis Potosí", "Celaya"] },
-];
-
-const units = [
-  { placa: "QRO-2145-B", modelo: "Nissan Urvan 2022", ruta: "R-01", conductor: "Óscar Ramírez G.", km: "142,800", status: "En ruta" },
-  { placa: "CDMX-9832-A", modelo: "Sprinter 316 2021", ruta: "R-02", conductor: "Lupita Méndez V.", km: "98,400", status: "En ruta" },
-  { placa: "NL-4421-C", modelo: "Transit 350 2023", ruta: "R-04", conductor: "Juan Cortés H.", km: "45,200", status: "En base" },
-  { placa: "JAL-7712-D", modelo: "Nissan Urvan 2020", ruta: "R-03", conductor: "Ana Flores R.", km: "188,300", status: "Mantenimiento" },
-  { placa: "PUE-3356-B", modelo: "Sprinter 311 2022", ruta: "R-05", conductor: "Pedro Ibáñez L.", km: "76,100", status: "En ruta" },
-];
-
-const statusUnitColor: Record<string, { bg: string; color: string }> = {
-  "En ruta": { bg: "#eff6ff", color: "#3b82f6" },
-  "En base": { bg: "#f0fdf4", color: "#16a34a" },
-  "Mantenimiento": { bg: "#fef2f2", color: "#dc2626" },
-};
+import React, { useEffect, useState } from 'react';
+import { repartidoresService } from '../services/repartidoresService';
+import type { RepartidorDto } from '../services/types';
 
 export default function Routes() {
-  const [view, setView] = useState<"rutas" | "unidades">("rutas");
-  const [selected, setSelected] = useState<typeof routes[0] | null>(null);
+  const [repartidores, setRepartidores] = useState<RepartidorDto[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+
+  // Campos Formulario Repartidor
+  const [usuarioId, setUsuarioId] = useState<string>('');
+  const [licencia, setLicencia] = useState<string>('');
+  const [vehiculo, setVehiculo] = useState<string>('');
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await repartidoresService.getAll();
+      setRepartidores(data || []);
+    } catch (err: any) {
+      setError(err?.message || 'Error al conectar con la API.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+
+    const uId = parseInt(usuarioId, 10);
+    if (isNaN(uId) || uId <= 0) {
+      setError('Escriba un ID de usuario válido.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await repartidoresService.create({
+        usuarioId: uId,
+        licencia: licencia.trim() || undefined,
+        vehiculo: vehiculo.trim() || undefined,
+      });
+
+      setSuccessMsg('¡Repartidor registrado correctamente!');
+      setUsuarioId('');
+      setLicencia('');
+      setVehiculo('');
+      loadData();
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo crear el repartidor.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Toggle */}
-      <div style={{ background: "#fff", borderRadius: 12, padding: "16px 24px", border: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", gap: 4 }}>
-          {(["rutas", "unidades"] as const).map(v => (
-            <button key={v} onClick={() => setView(v)} style={{
-              padding: "7px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
-              background: view === v ? "#0d1b2a" : "transparent",
-              color: view === v ? "#fff" : "#64748b",
-            }}>
-              {v === "rutas" ? "🗺️ Rutas" : "🚚 Unidades"}
-            </button>
-          ))}
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Rutas de Entrega y Repartidores</h1>
+          <p className="text-sm text-slate-500">Gestión de personal de entrega registrado en WordTruck</p>
         </div>
-        <div style={{ fontSize: 12, color: "#94a3b8" }}>{routes.length} rutas · {units.length} unidades registradas</div>
+        <button
+          onClick={loadData}
+          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-all"
+        >
+          ↻ Actualizar
+        </button>
       </div>
 
-      {view === "rutas" && (
-        <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, flex: 1 }}>
-            {routes.map(r => {
-              const pct = Math.round((r.entregados / r.paquetesHoy) * 100);
-              const isActive = selected?.id === r.id;
-              return (
-                <div
-                  key={r.id}
-                  onClick={() => setSelected(isActive ? null : r)}
-                  style={{
-                    background: "#fff", borderRadius: 12, padding: "20px",
-                    border: `1.5px solid ${isActive ? "#f59e0b" : "#e2e8f0"}`,
-                    cursor: "pointer", transition: "border-color 0.15s",
-                    boxShadow: isActive ? "0 0 0 3px #fef3c7" : "none"
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                    <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, fontWeight: 700, background: "#fef3c7", color: "#b45309", padding: "3px 10px", borderRadius: 6 }}>{r.id}</span>
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: r.status === "Activo" ? "#f0fdf4" : "#fef2f2", color: r.status === "Activo" ? "#16a34a" : "#dc2626" }}>{r.status}</span>
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{r.nombre}</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 16 }}>{r.zonas.join(" · ")}</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                    {[
-                      { l: "Unidades", v: r.unidades },
-                      { l: "Paquetes", v: r.paquetesHoy },
-                      { l: "Entregados", v: r.entregados },
-                      { l: "Pendientes", v: r.pendientes },
-                    ].map(s => (
-                      <div key={s.l}>
-                        <div style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.l}</div>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", fontFamily: "JetBrains Mono, monospace" }}>{s.v}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#64748b", marginBottom: 4 }}>
-                      <span>Progreso de entrega</span>
-                      <span style={{ fontWeight: 700, color: pct >= 90 ? "#10b981" : "#f59e0b" }}>{pct}%</span>
-                    </div>
-                    <div style={{ height: 5, background: "#f1f5f9", borderRadius: 99 }}>
-                      <div style={{ height: "100%", width: `${pct}%`, background: pct >= 90 ? "#10b981" : "#f59e0b", borderRadius: 99 }} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Tabla de Repartidores */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Repartidores Activos</h2>
 
-          {selected && (
-            <div style={{ width: 260, flexShrink: 0, background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>Detalle de ruta</div>
-                <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 16 }}>×</button>
-              </div>
-              <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 13, color: "#f59e0b", fontWeight: 700, marginBottom: 8 }}>{selected.id}</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>{selected.nombre}</div>
-              {[
-                { l: "Kilómetros cubiertos", v: `${selected.km} km` },
-                { l: "Unidades asignadas", v: String(selected.unidades) },
-                { l: "Conductores", v: String(selected.conductores) },
-                { l: "KM por unidad", v: `~${Math.round(selected.km / selected.unidades)} km` },
-              ].map(r => (
-                <div key={r.l} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f1f5f9" }}>
-                  <span style={{ fontSize: 12, color: "#94a3b8" }}>{r.l}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "JetBrains Mono, monospace", color: "#0f172a" }}>{r.v}</span>
-                </div>
-              ))}
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8, fontWeight: 600 }}>Zonas cubiertas</div>
-                {selected.zonas.map(z => (
-                  <div key={z} style={{ fontSize: 12, color: "#374151", padding: "4px 0", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#f59e0b", display: "inline-block" }} />
-                    {z}
-                  </div>
-                ))}
-              </div>
+          {loading ? (
+            <p className="text-sm text-slate-500 py-4">Cargando repartidores...</p>
+          ) : repartidores.length === 0 ? (
+            <p className="text-sm text-slate-400 py-4 text-center">No hay repartidores registrados.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="py-3 px-2">ID</th>
+                    <th className="py-3 px-2">Nombre y Apellido</th>
+                    <th className="py-3 px-2">Usuario ID</th>
+                    <th className="py-3 px-2">Licencia</th>
+                    <th className="py-3 px-2">Vehículo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                  {repartidores.map((item) => (
+                    <tr key={item.repartidorId} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-2 font-bold text-amber-600">#{item.repartidorId}</td>
+                      <td className="py-3 px-2 font-semibold text-slate-900">{item.nombre} {item.apellido}</td>
+                      <td className="py-3 px-2 text-slate-500">User #{item.usuarioId}</td>
+                      <td className="py-3 px-2">{item.licencia || '-'}</td>
+                      <td className="py-3 px-2 font-medium">{item.vehiculo || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
-      )}
 
-      {view === "unidades" && (
-        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                {["Placa", "Modelo", "Ruta", "Conductor", "Kilometraje", "Estado"].map(h => (
-                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#64748b", letterSpacing: "0.05em", textTransform: "uppercase", borderBottom: "1px solid #e2e8f0" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {units.map((u, i) => {
-                const sc = statusUnitColor[u.status];
-                return (
-                  <tr key={u.placa} style={{ borderBottom: i < units.length - 1 ? "1px solid #f1f5f9" : "none" }}>
-                    <td style={{ padding: "12px 16px", fontFamily: "JetBrains Mono, monospace", fontSize: 12, fontWeight: 700, color: "#0f172a" }}>{u.placa}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{u.modelo}</td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, fontWeight: 700, background: "#fef3c7", color: "#b45309", padding: "3px 8px", borderRadius: 6 }}>{u.ruta}</span>
-                    </td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, color: "#0f172a", fontWeight: 500 }}>{u.conductor}</td>
-                    <td style={{ padding: "12px 16px", fontFamily: "JetBrains Mono, monospace", fontSize: 12, color: "#64748b" }}>{u.km} km</td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <span style={{ background: sc.bg, color: sc.color, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{u.status}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        {/* Registro Repartidor */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit">
+          <h2 className="text-lg font-bold text-slate-900 mb-2">Nuevo Repartidor</h2>
+          <p className="text-xs text-slate-500 mb-4">Asignar rol de repartidor a un Usuario ID</p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-medium">
+                {error}
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-medium">
+                {successMsg}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Usuario ID (Número)</label>
+              <input
+                type="number"
+                value={usuarioId}
+                onChange={(e) => setUsuarioId(e.target.value)}
+                placeholder="Ej: 3"
+                required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Licencia de Conducir</label>
+              <input
+                type="text"
+                value={licencia}
+                onChange={(e) => setLicencia(e.target.value)}
+                placeholder="Ej: 001-9999999-9"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Vehículo / Placa</label>
+              <input
+                type="text"
+                value={vehiculo}
+                onChange={(e) => setVehiculo(e.target.value)}
+                placeholder="Ej: Motocicleta - Placa K01293"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-md shadow-amber-500/20 disabled:opacity-50"
+            >
+              {submitting ? 'Procesando...' : 'Crear Repartidor'}
+            </button>
+          </form>
         </div>
-      )}
+      </div>
     </div>
   );
 }
