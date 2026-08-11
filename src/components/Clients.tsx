@@ -1,114 +1,310 @@
-import { useState } from "react";
-
-const clients = [
-  { id: "CLT-001", nombre: "Distribuidora Morales S.A.", contacto: "Ing. Roberto Morales", email: "r.morales@distmorales.com.mx", tel: "55 4821 0033", tipo: "Corporativo", status: "Activo", envios: 284, saldo: "$12,480.00" },
-  { id: "CLT-002", nombre: "Farmacia El Sol", contacto: "Lic. Carmen Vega", email: "cvega@farmaciasol.mx", tel: "33 9812 4455", tipo: "PYME", status: "Activo", envios: 198, saldo: "$4,320.00" },
-  { id: "CLT-003", nombre: "Electrónica Zenteno", contacto: "Sr. Marco Zenteno", email: "m.zenteno@ezenteno.com", tel: "81 3344 5566", tipo: "PYME", status: "Activo", envios: 175, saldo: "$7,850.00" },
-  { id: "CLT-004", nombre: "Mueblería Confort", contacto: "Sra. Patricia Leal", email: "pleal@mueblesconfort.mx", tel: "55 7890 1122", tipo: "PYME", status: "Suspendido", envios: 143, saldo: "$0.00" },
-  { id: "CLT-005", nombre: "Clínica San Rafael", contacto: "Dr. Alejandro Ruiz", email: "admin@clinicasanrafael.mx", tel: "81 2233 9900", tipo: "Corporativo", status: "Activo", envios: 127, saldo: "$9,110.00" },
-  { id: "CLT-006", nombre: "Librería Cultura", contacto: "Sra. Fabiola Torres", email: "ftorres@libreriacultura.mx", tel: "44 2211 3345", tipo: "Particular", status: "Activo", envios: 89, saldo: "$1,240.00" },
-  { id: "CLT-007", nombre: "Taller Automotriz Rápido", contacto: "Sr. Ernesto Campos", email: "ernesto@tallerrapido.mx", tel: "46 5543 2211", tipo: "Particular", status: "Activo", envios: 54, saldo: "$2,370.00" },
-];
+import React, { useEffect, useState } from 'react';
+import { clientesService } from '../services/clientesService';
+import { usuariosService } from '../services/usuariosService';
+import type { ClienteDto, UsuarioDto } from '../services/types';
 
 export default function Clients() {
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<typeof clients[0] | null>(null);
+  const [clientes, setClientes] = useState<ClienteDto[]>([]);
+  const [usuarios, setUsuarios] = useState<UsuarioDto[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const filtered = clients.filter(c => {
-    const q = search.toLowerCase();
-    return !q || c.nombre.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) || c.contacto.toLowerCase().includes(q);
-  });
+  // Modo de creación: 'existente' (vincular a usuario existente) o 'nuevo' (crear usuario + cliente)
+  const [mode, setMode] = useState<'existente' | 'nuevo'>('existente');
+
+  // Campos Modo Existente
+  const [usuarioId, setUsuarioId] = useState<string>('');
+  const [documento, setDocumento] = useState<string>('');
+  const [direccion, setDireccion] = useState<string>('');
+
+  // Campos Modo Nuevo Usuario
+  const [nombre, setNombre] = useState<string>('');
+  const [apellido, setApellido] = useState<string>('');
+  const [correo, setCorreo] = useState<string>('');
+  const [telefono, setTelefono] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [clientesData, usuariosData] = await Promise.all([
+        clientesService.getAll(),
+        usuariosService.getAll(),
+      ]);
+      setClientes(clientesData || []);
+      setUsuarios(usuariosData || []);
+    } catch (err: any) {
+      setError(err?.message || 'Error al conectar con la API.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+    setSubmitting(true);
+
+    try {
+      if (mode === 'existente') {
+        const numUsuarioId = parseInt(usuarioId, 10);
+        if (isNaN(numUsuarioId) || numUsuarioId <= 0) {
+          throw new Error('Seleccione un usuario válido de la lista.');
+        }
+
+        await clientesService.create({
+          usuarioId: numUsuarioId,
+          documento: documento.trim() || undefined,
+          direccion: direccion.trim() || undefined,
+        });
+      } else {
+        await clientesService.createFull({
+          nombre: nombre.trim(),
+          apellido: apellido.trim(),
+          correo: correo.trim(),
+          telefono: telefono.trim() || undefined,
+          password: password,
+          documento: documento.trim() || undefined,
+          direccion: direccion.trim() || undefined,
+        });
+      }
+
+      setSuccessMsg('¡Cliente registrado correctamente en la base de datos!');
+      
+      // Limpiar formulario
+      setUsuarioId('');
+      setDocumento('');
+      setDireccion('');
+      setNombre('');
+      setApellido('');
+      setCorreo('');
+      setTelefono('');
+      setPassword('');
+
+      loadData();
+    } catch (err: any) {
+      setError(err?.message || 'Ocurrió un error al registrar el cliente.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Top bar */}
-        <div style={{ background: "#fff", borderRadius: 12, padding: "18px 24px", border: "1px solid #e2e8f0", marginBottom: 20, display: "flex", gap: 12, alignItems: "center" }}>
-          <div style={{ position: "relative", flex: 1 }}>
-            <svg style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar cliente por nombre, ID o contacto..." style={{ width: "100%", padding: "9px 12px 9px 34px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 13.5, outline: "none", color: "#0f172a" }} />
-          </div>
-          <button style={{ padding: "9px 20px", background: "#f59e0b", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#0d1b2a", cursor: "pointer", whiteSpace: "nowrap" }}>
-            + Nuevo cliente
-          </button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
+          <p className="text-sm text-slate-500">Gestión de clientes y vinculación con la base de datos de WordTruck</p>
         </div>
-
-        {/* Table */}
-        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                {["ID", "Cliente / Contacto", "Tipo", "Envíos", "Saldo", "Estado", ""].map(h => (
-                  <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#64748b", letterSpacing: "0.05em", textTransform: "uppercase", borderBottom: "1px solid #e2e8f0" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c, i) => (
-                <tr key={c.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #f1f5f9" : "none", background: selected?.id === c.id ? "#fffbeb" : "transparent" }}>
-                  <td style={{ padding: "11px 14px", fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: "#64748b" }}>{c.id}</td>
-                  <td style={{ padding: "11px 14px" }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{c.nombre}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8" }}>{c.contacto}</div>
-                  </td>
-                  <td style={{ padding: "11px 14px" }}>
-                    <span style={{
-                      padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
-                      background: c.tipo === "Corporativo" ? "#eff6ff" : c.tipo === "PYME" ? "#f3e8ff" : "#f0fdf4",
-                      color: c.tipo === "Corporativo" ? "#3b82f6" : c.tipo === "PYME" ? "#9333ea" : "#16a34a"
-                    }}>{c.tipo}</span>
-                  </td>
-                  <td style={{ padding: "11px 14px", fontSize: 13, fontFamily: "JetBrains Mono, monospace", color: "#374151" }}>{c.envios}</td>
-                  <td style={{ padding: "11px 14px", fontSize: 13, fontFamily: "JetBrains Mono, monospace", fontWeight: 600, color: "#0f172a" }}>{c.saldo}</td>
-                  <td style={{ padding: "11px 14px" }}>
-                    <span style={{
-                      padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
-                      background: c.status === "Activo" ? "#f0fdf4" : "#fef2f2",
-                      color: c.status === "Activo" ? "#16a34a" : "#dc2626"
-                    }}>{c.status}</span>
-                  </td>
-                  <td style={{ padding: "11px 14px" }}>
-                    <button onClick={() => setSelected(selected?.id === c.id ? null : c)} style={{ padding: "4px 10px", background: selected?.id === c.id ? "#fef3c7" : "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, fontSize: 11, fontWeight: 600, color: "#374151", cursor: "pointer" }}>
-                      {selected?.id === c.id ? "Cerrar" : "Ver"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <button
+          onClick={loadData}
+          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-all flex items-center gap-2"
+        >
+          ↻ Actualizar
+        </button>
       </div>
 
-      {/* Detail */}
-      {selected && (
-        <div style={{ width: 280, flexShrink: 0, background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>Ficha del cliente</div>
-            <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 16 }}>×</button>
-          </div>
-          <div style={{ width: 48, height: 48, borderRadius: 12, background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, marginBottom: 16 }}>🏢</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{selected.nombre}</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 20 }}>{selected.id}</div>
-          {[
-            { label: "Contacto", val: selected.contacto },
-            { label: "Email", val: selected.email },
-            { label: "Teléfono", val: selected.tel },
-            { label: "Tipo", val: selected.tipo },
-            { label: "Envíos totales", val: String(selected.envios) },
-            { label: "Saldo pendiente", val: selected.saldo },
-          ].map(r => (
-            <div key={r.label} style={{ display: "flex", flexDirection: "column", padding: "8px 0", borderBottom: "1px solid #f1f5f9" }}>
-              <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{r.label}</span>
-              <span style={{ fontSize: 12, color: "#0f172a", fontWeight: 500, marginTop: 2 }}>{r.val}</span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Tabla de Clientes */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Clientes Registrados</h2>
+
+          {loading ? (
+            <p className="text-sm text-slate-500 py-4">Cargando datos desde la API ASP.NET Core...</p>
+          ) : clientes.length === 0 ? (
+            <p className="text-sm text-slate-400 py-4 text-center">No hay clientes registrados aún.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="py-3 px-2">ID</th>
+                    <th className="py-3 px-2">Nombre y Apellido</th>
+                    <th className="py-3 px-2">Correo</th>
+                    <th className="py-3 px-2">Documento</th>
+                    <th className="py-3 px-2">Dirección</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                  {clientes.map((item) => (
+                    <tr key={item.clienteId} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-2 font-bold text-amber-600">#{item.clienteId}</td>
+                      <td className="py-3 px-2 font-semibold text-slate-900">{item.nombre} {item.apellido}</td>
+                      <td className="py-3 px-2 text-slate-500">{item.correo}</td>
+                      <td className="py-3 px-2">{item.documento || '-'}</td>
+                      <td className="py-3 px-2">{item.direccion || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
-          <button style={{ width: "100%", marginTop: 20, padding: "9px", background: "#0d1b2a", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-            Editar cliente
-          </button>
+          )}
         </div>
-      )}
+
+        {/* Formulario de Registro */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Registrar Cliente</h2>
+            <p className="text-xs text-slate-500">Selecciona el modo de registro</p>
+          </div>
+
+          {/* Selector de Modo */}
+          <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+            <button
+              type="button"
+              onClick={() => setMode('existente')}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                mode === 'existente' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Usuario Existente
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('nuevo')}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                mode === 'nuevo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Nuevo Usuario
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-medium">
+                {error}
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-medium">
+                {successMsg}
+              </div>
+            )}
+
+            {mode === 'existente' ? (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Seleccionar Usuario</label>
+                <select
+                  value={usuarioId}
+                  onChange={(e) => setUsuarioId(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="">-- Selecciona un usuario --</option>
+                  {usuarios.map((u) => (
+                    <option key={u.usuarioId} value={u.usuarioId}>
+                      #{u.usuarioId} - {u.nombre} {u.apellido} ({u.correo})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Nombre</label>
+                    <input
+                      type="text"
+                      value={nombre}
+                      onChange={(e) => setNombre(e.target.value)}
+                      required
+                      placeholder="Ej: Carlos"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Apellido</label>
+                    <input
+                      type="text"
+                      value={apellido}
+                      onChange={(e) => setApellido(e.target.value)}
+                      required
+                      placeholder="Ej: Gómez"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Correo Electrónico</label>
+                  <input
+                    type="email"
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
+                    required
+                    placeholder="carlos@gmail.com"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Teléfono</label>
+                    <input
+                      type="text"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                      placeholder="8091234567"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Contraseña</label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      placeholder="••••••••"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Documento / Cédula</label>
+              <input
+                type="text"
+                value={documento}
+                onChange={(e) => setDocumento(e.target.value)}
+                placeholder="001-0000000-0"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Dirección</label>
+              <input
+                type="text"
+                value={direccion}
+                onChange={(e) => setDireccion(e.target.value)}
+                placeholder="Calle, Sector, Ciudad"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-md shadow-amber-500/20 disabled:opacity-50 mt-2"
+            >
+              {submitting ? 'Procesando...' : 'Guardar Cliente'}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

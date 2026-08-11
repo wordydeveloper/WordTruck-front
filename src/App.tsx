@@ -1,29 +1,26 @@
-import { useState } from "react";
-import Login from "./components/Login";
-import Layout from "./components/Layout";
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Login from './components/Login';
+import BackendApp from './components/BackendApp';
 
-export type Screen =
-  | "dashboard"
-  | "nuevo-paquete"
-  | "consulta"
-  | "seguimiento"
-  | "reportes"
-  | "clientes"
-  | "rutas";
+function AppContent() {
+  const { user, logout } = useAuth();
 
-export default function App() {
-  const [authenticated, setAuthenticated] = useState(false);
-  const [screen, setScreen] = useState<Screen>("dashboard");
-
-  if (!authenticated) {
-    return <Login onLogin={() => setAuthenticated(true)} />;
+  if (!user) {
+    return <Login />;
   }
 
   return (
-    <Layout
-      screen={screen}
-      onNavigate={setScreen}
-      onLogout={() => setAuthenticated(false)}
+    <BackendApp
+      user={user}
+      onLogout={logout}
     />
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

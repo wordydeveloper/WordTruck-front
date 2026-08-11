@@ -1,155 +1,95 @@
-import { useState } from "react";
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
-interface Props {
-  onLogin: () => void;
-}
+export default function Login() {
+  const { login, loading, error } = useAuth();
+  const [correo, setCorreo] = useState('wordy848@gmail.com');
+  const [password, setPassword] = useState('');
 
-export default function Login({ onLogin }: Props) {
-  const [user, setUser] = useState("");
-  const [pass, setPass] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !pass) { setError("Complete todos los campos."); return; }
-    setLoading(true);
-    setTimeout(() => {
-      if (user === "admin" && pass === "admin123") {
-        onLogin();
-      } else {
-        setError("Usuario o contraseña incorrectos.");
-        setLoading(false);
-      }
-    }, 800);
+    await login(correo, password);
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", background: "#0d1b2a" }}>
-      {/* Left panel */}
-      <div style={{
-        flex: 1, display: "flex", flexDirection: "column", justifyContent: "center",
-        padding: "60px", background: "linear-gradient(145deg, #0d1b2a 0%, #132338 100%)",
-        borderRight: "1px solid #1e3a5f"
-      }}>
-        <div style={{ maxWidth: 480 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 48 }}>
-            <div style={{
-              width: 44, height: 44, background: "#f59e0b", borderRadius: 8,
-              display: "flex", alignItems: "center", justifyContent: "center"
-            }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="#0d1b2a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M20 9l-8 6-8-6" stroke="#0d1b2a" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
+    <div className="min-h-screen w-full flex flex-col md:flex-row bg-slate-900 text-slate-100">
+      {/* Panel Izquierdo: Branding WordTruck */}
+      <div className="md:w-1/2 p-8 md:p-16 flex flex-col justify-between bg-[#0b132b] border-r border-slate-800">
+        <div>
+          <div className="flex items-center gap-3 mb-12">
+            <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center text-slate-950 font-black text-2xl shadow-lg shadow-amber-500/20">
+              W
             </div>
             <div>
-              <div style={{ color: "#ffffff", fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em" }}>WordTrack</div>
-              <div style={{ color: "#64748b", fontSize: 12 }}>Sistema de Gestión Logística</div>
+              <h1 className="text-2xl font-bold text-white tracking-tight">WordTruck</h1>
+              <p className="text-xs text-slate-400 font-medium">Sistema de Gestión Logística</p>
             </div>
           </div>
 
-          <h1 style={{ color: "#ffffff", fontSize: 36, fontWeight: 700, lineHeight: 1.15, marginBottom: 16, letterSpacing: "-0.03em" }}>
-            Control total de tu<br />
-            <span style={{ color: "#f59e0b" }}>cadena logística</span>
-          </h1>
-          <p style={{ color: "#64748b", fontSize: 15, lineHeight: 1.7, marginBottom: 40 }}>
-            Gestión integral de paquetes, rutas, clientes y reportes en tiempo real para operaciones de paquetería y mensajería.
-          </p>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {[
-              { icon: "📦", label: "Seguimiento en tiempo real de paquetes" },
-              { icon: "🗺️", label: "Optimización de rutas de entrega" },
-              { icon: "📊", label: "Reportes y analítica operacional" },
-            ].map((f) => (
-              <div key={f.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontSize: 18 }}>{f.icon}</span>
-                <span style={{ color: "#94a3b8", fontSize: 14 }}>{f.label}</span>
-              </div>
-            ))}
+          <div className="max-w-md mt-16">
+            <h2 className="text-4xl md:text-5xl font-extrabold text-white leading-tight mb-6">
+              Control total de tu <span className="text-amber-500">cadena logística</span>
+            </h2>
+            <p className="text-slate-400 text-base md:text-lg leading-relaxed">
+              Paquetes, clientes, seguimiento, facturación y operación conectados directamente con tu API ASP.NET Core.
+            </p>
           </div>
+        </div>
+
+        <div className="text-xs text-slate-500 mt-12">
+          © {new Date().getFullYear()} WordTruck Logistics System.
         </div>
       </div>
 
-      {/* Right panel — form */}
-      <div style={{
-        width: 480, display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "60px 48px", background: "#f8fafc"
-      }}>
-        <div style={{ width: "100%" }}>
-          <h2 style={{ fontSize: 24, fontWeight: 700, color: "#0f172a", marginBottom: 6, letterSpacing: "-0.02em" }}>
-            Iniciar sesión
-          </h2>
-          <p style={{ color: "#64748b", fontSize: 14, marginBottom: 32 }}>
-            Ingrese sus credenciales para continuar
-          </p>
+      {/* Panel Derecho: Formulario de Inicio de Sesión */}
+      <div className="md:w-1/2 bg-white text-slate-900 p-8 md:p-16 flex items-center justify-center">
+        <div className="w-full max-w-md space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Iniciar sesión</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Use un usuario registrado en WordTruck.
+            </p>
+          </div>
 
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#374151", marginBottom: 6 }}>
-                Usuario
-              </label>
-              <input
-                type="text"
-                value={user}
-                onChange={e => { setUser(e.target.value); setError(""); }}
-                placeholder="admin"
-                style={{
-                  width: "100%", padding: "10px 14px", border: "1.5px solid #e2e8f0",
-                  borderRadius: 8, fontSize: 14, outline: "none", background: "#fff",
-                  color: "#0f172a", transition: "border-color 0.15s"
-                }}
-                onFocus={e => (e.target.style.borderColor = "#f59e0b")}
-                onBlur={e => (e.target.style.borderColor = "#e2e8f0")}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#374151", marginBottom: 6 }}>
-                Contraseña
-              </label>
-              <input
-                type="password"
-                value={pass}
-                onChange={e => { setPass(e.target.value); setError(""); }}
-                placeholder="••••••••"
-                style={{
-                  width: "100%", padding: "10px 14px", border: "1.5px solid #e2e8f0",
-                  borderRadius: 8, fontSize: 14, outline: "none", background: "#fff",
-                  color: "#0f172a", transition: "border-color 0.15s"
-                }}
-                onFocus={e => (e.target.style.borderColor = "#f59e0b")}
-                onBlur={e => (e.target.style.borderColor = "#e2e8f0")}
-              />
-            </div>
-
+          <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div style={{
-                background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8,
-                padding: "10px 14px", color: "#dc2626", fontSize: 13
-              }}>
+              <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium">
                 {error}
               </div>
             )}
 
+            <div className="space-y-1.5">
+              <label className="block text-sm font-semibold text-slate-700">Correo</label>
+              <input
+                type="email"
+                value={correo}
+                onChange={(e) => setCorreo(e.target.value)}
+                placeholder="ejemplo@correo.com"
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-slate-900"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-semibold text-slate-700">Contraseña</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-slate-900"
+              />
+            </div>
+
             <button
               type="submit"
               disabled={loading}
-              style={{
-                padding: "12px", background: loading ? "#d97706" : "#f59e0b",
-                color: "#0d1b2a", border: "none", borderRadius: 8, fontSize: 14,
-                fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
-                letterSpacing: "0.01em", transition: "background 0.15s", marginTop: 4
-              }}
+              className="w-full py-3.5 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl shadow-lg shadow-amber-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
-              {loading ? "Verificando..." : "Ingresar al sistema"}
+              {loading ? 'Ingresando...' : 'Ingresar al sistema'}
             </button>
           </form>
-
-          <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 32, textAlign: "center" }}>
-            Demo: usuario <span style={{ fontFamily: "monospace", color: "#64748b" }}>admin</span> / contraseña <span style={{ fontFamily: "monospace", color: "#64748b" }}>admin123</span>
-          </p>
         </div>
       </div>
     </div>
